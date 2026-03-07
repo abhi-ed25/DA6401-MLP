@@ -31,7 +31,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description = "Customizing your MLP")
 
     #chossing data set
-    parser.add_argument("-d","--dataset", type=str, required=True, choices = ["MNIST", "FASHION MNIST"], help = "MNIST or FASHION MNIST: ")
+    parser.add_argument("-d","--dataset", type=str, required=True, choices = ["mnist", "fashion_mnist"], help = "MNIST or FASHION MNIST: ")
 
     #num of epochs
     parser.add_argument("-e","--epochs", type=int, required=True, help = "Enter number of epochs: ")
@@ -40,7 +40,7 @@ def parse_args():
     parser.add_argument("-b","--batch_size", type=int, required=True, help = "Enter number of data points in  batch: ")
 
     #chossing loss function
-    parser.add_argument("-l","--loss", type=str, required=True, choices = ["mse", "ce"], help = "Loss function (mse or ce): ")
+    parser.add_argument("-l","--loss", type=str, required=True, choices = ["mean_squared_error", "cross_entropy"], help = "Loss function (mse or ce): ")
 
     #setting up mini batch size
     parser.add_argument("-o","--optimizer", type=str, required=True, choices = ["sgd", "momentum", "nag", "rmsprop", "adam", "nadam"], help = "Optimizer {sgd, momentum, nag, rmsprop, adam or nadam}: ")
