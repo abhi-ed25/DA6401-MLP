@@ -96,6 +96,8 @@ class MLP:
       #empty list for gradients for w&b
       grads_W = []
       grads_b = []
+      self.grad_W = grads_W
+      self.grad_b = grads_b
       m = X.shape[0]
 
       #o/p of forward pass at last node is prediction this is declared here
