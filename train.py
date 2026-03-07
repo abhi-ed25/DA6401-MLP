@@ -169,5 +169,25 @@ def main():
     np.save("model.npy", params)
     print("Model saved successfully as model.npy")
 
+    #saving best configuration
+    best_config = {
+        "dataset": args.dataset,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "loss": args.loss,
+        "optimizer": args.optimizer,
+        "learning_rate": args.learning_rate,
+        "weight_decay": args.weight_decay,
+        "num_layers": args.num_layers,
+        "hidden_size": args.hidden_size,
+        "activation": args.activation,
+        "weight_init": args.weight_init
+    }
+    
+    with open("best_config.json", "w") as f:
+        json.dump(best_config, f, indent=4)
+    
+    print("Best configuration saved as best_config.json")
+
 if __name__ == "__main__":
     main()
