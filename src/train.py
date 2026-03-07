@@ -10,7 +10,7 @@ import json
 #importing all the def functions for usage
 from utils.data_loader import load_data
 from ann.neural_network import NeuralNetwork
-from ann.optimizers import OPT
+from ann.optimizer import OPT
 
 #defining randomness for wandb
 np.random.seed(42)
