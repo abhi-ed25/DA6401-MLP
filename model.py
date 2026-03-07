@@ -4,7 +4,7 @@
 import numpy as np
 
 #within the class MLP defininf all the functions
-class MLP:
+class NeuralNetwork:
   def __init__(self, input_size, output_size, hidden_sizes, activations, weight_init):
 
     #creating full layer structure: input → hidden → output
