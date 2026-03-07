@@ -19,6 +19,9 @@ def activation(x, activation):
         return np.tanh(x)
     if activation == "relu":
         return np.maximum(0, x)
+    if activation == "softmax":
+        exp = np.exp(x - np.max(x, axis=1, keepdims=True))
+        return exp / np.sum(exp, axis=1, keepdims=True)
     else:
         raise ValueError("Please give name of activation function to be used")
 
@@ -152,6 +155,8 @@ def main():
   biases  = [b.astype(np.float64) for b in params["b"]]
   #running all the arg parse for delivering values and commands
   activation_functions = [lambda x, act=a: activation(x, act) for a in args.activation]
+  #output layer activation is always softmax
+  activation_functions.append(lambda x: activation(x, "softmax"))
   #forward pass for inference
   print("Please wait: running inference...")
   outputs = forward(X_test, weights, biases, activation_functions)
@@ -164,12 +169,7 @@ def main():
   wandb.init(project="DA6401-MLP-Inference", config=vars(args))
 
   #logging in the metrics
-  wandb.log({
-      "accuracy": acc,
-      "precision": prec,
-      "recall": rec,
-      "f1_score": f1
-  })
+  wandb.log({"accuracy": acc, "precision": prec, "recall": rec, "f1_score": f1})
   wandb.finish()
 
   #print output of the inference run
@@ -182,195 +182,6 @@ def main():
 
 
 
-
-#sweep for the hyper parameter 100 test in 2.2
-def sweep_run():
-    wandb.init(project="DA6401-MLP-Inference")
-    config = wandb.config
-
-    #loading the data for mnist digits
-    if config.dataset == "MNIST":
-        (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    else:
-        (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
-
-    #reshaping and normalize
-    x_train = x_train.reshape(x_train.shape[0], -1).astype(np.float64) / 255.0
-    x_test  = x_test.reshape(x_test.shape[0], -1).astype(np.float64) / 255.0
-
-    #creating architecture from sweep config
-    input_size = x_train.shape[1]
-    output_size = 10
-    hidden_sizes = [config.hidden_size] if isinstance(config.hidden_size, int) else config.hidden_size
-    layer_sizes = [input_size] + hidden_sizes + [output_size]
-
-    weights = []
-    biases = []
-
-    #initialization from sweep config
-    for i in range(len(layer_sizes) - 1):
-        if config.weight_init == "xavier":
-            limit = np.sqrt(6 / (layer_sizes[i] + layer_sizes[i+1]))
-            W = np.random.uniform(-limit, limit, (layer_sizes[i], layer_sizes[i+1]))
-        else:
-            W = np.random.randn(layer_sizes[i], layer_sizes[i+1]) * 0.01
-        b = np.zeros((1, layer_sizes[i+1]))
-        weights.append(W)
-        biases.append(b)
-
-    #activation functions
-    activation_list = [config.activation] * len(weights)
-    activation_functions = [lambda x, act=a: activation(x, act) for a in activation_list]
-
-    #training accuracy (no training, just evaluating random init)
-    train_outputs = forward(x_train, weights, biases, activation_functions)
-    print("\nLogits (Forward Pass Output):")
-    print(train_outputs)
-    train_preds = np.argmax(train_outputs, axis=1)
-    train_acc = np.mean(train_preds == y_train)
-
-    #testing accuracy
-    test_outputs = forward(x_test, weights, biases, activation_functions)
-    print("\nTest Logits:")
-    print(test_outputs)
-    test_preds = np.argmax(test_outputs, axis=1)
-    test_acc = np.mean(test_preds == y_test)
-
-    #logging the data for both
-    wandb.log({"accuracy": test_acc, "train_accuracy": train_acc, "test_accuracy": test_acc})
-
-    #creating table for overlay visualization
-    overlay_table = wandb.Table(columns=["metric", "accuracy"])
-    overlay_table.add_data("Train Accuracy", train_acc)
-    overlay_table.add_data("Test Accuracy", test_acc)
-
-    wandb.log({"Train vs Test Accuracy Overlay":
-               wandb.plot.line(overlay_table, "metric", "accuracy",
-                               title="Overlay Plot: Train vs Test Accuracy")})
-
-    wandb.finish()
-
-
-#possible hyp param combinations for the sweep
-#creating dictionary for all permutations
-sweep_config = {
-    "method": "random",
-    "metric": {"name": "accuracy", "goal": "maximize"},
-    "parameters": {
-        "dataset": {"values": ["MNIST"]},
-        "epochs": {"values": [1, 10, 20]},
-        "batch_size": {"values": [16, 64, 256]},
-        "loss": {"values": ["mse", "ce"]},
-        "optimizer": {"values": ["sgd", "adam", "nadam"]},
-        "learning_rate": {"values": [0.01, 0.05, 0.1]},
-        "weight_decay": {"values": [0.0001, 0.01, 0.1]},
-        "num_layers": {"values": [1, 3, 6]},
-        "hidden_size": {"values": [64, 128]},
-        "activation": {"values": ["sigmoid", "relu"]},
-        "weight_init": {"values": ["xavier", "random"]}
-    }
-}
-
-#comparison between xavier and zero initialization
-def zero(args):
-    wandb.init(project="DA6401-MLP-Zero-vs-Xavier", config=vars(args))
-    #loading data (only one batch needed for gradient visualization)
-    if args.dataset == "MNIST":
-        (x_train, y_train), _ = mnist.load_data()
-    else:
-        (x_train, y_train), _ = fashion_mnist.load_data()
-
-    #reshaping and normalize
-    x_train = x_train.reshape(x_train.shape[0], -1).astype(np.float64) / 255.0
-    #taking one mini batch
-    X = x_train[:args.batch_size]
-    y = y_train[:args.batch_size]
-
-    input_size = X.shape[1]
-    output_size = 10
-    hidden_sizes = args.hidden_size
-    layer_sizes = [input_size] + hidden_sizes + [output_size]
-    gradients_xavier = []
-    gradients_zero = []
-
-    for init_type in ["xavier", "zero"]:
-        weights = []
-        biases = []
-
-        for i in range(len(layer_sizes) - 1):
-            if init_type == "xavier":
-                limit = np.sqrt(6 / (layer_sizes[i] + layer_sizes[i+1]))
-                W = np.random.uniform(-limit, limit, (layer_sizes[i], layer_sizes[i+1]))
-            else:
-                 W = np.zeros((layer_sizes[i], layer_sizes[i+1]))
-            b = np.zeros((1, layer_sizes[i+1]))
-            weights.append(W)
-            biases.append(b)
-
-        #forward pass storing activations
-        A = X
-        activations_store = [A]
-        activation_functions = [lambda x, act=a: activation(x, act) for a in args.activation]
-
-        for i in range(len(weights) - 1):
-            Z = A @ weights[i] + biases[i]
-            A = activation_functions[i](Z)
-            activations_store.append(A)
-
-        #output layer (softmax-like gradient assumption using CE derivative)
-        Z = A @ weights[-1] + biases[-1]
-        exp_scores = np.exp(Z - np.max(Z, axis=1, keepdims=True))
-        probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
-
-        one_hot = np.zeros_like(probs)
-        one_hot[np.arange(len(y)), y] = 1
-
-        dZ = probs - one_hot
-        #backprop to first hidden layer
-        dW_last = activations_store[-1].T @ dZ
-        dA_prev = dZ @ weights[-1].T
-
-        #first hidden layer gradient
-        if args.activation[0] == "relu":
-            dZ_hidden = dA_prev * (activations_store[1] > 0)
-        elif args.activation[0] == "sigmoid":
-            sig = activations_store[1]
-            dZ_hidden = dA_prev * sig * (1 - sig)
-        else:
-            dZ_hidden = dA_prev * (1 - activations_store[1]**2)
-
-        dW_first = activations_store[0].T @ dZ_hidden
-
-        #compute gradient norm per neuron (columns correspond to neurons)
-        grad_norm = np.linalg.norm(dW_first, axis=0)
-
-        if init_type == "xavier":
-            gradients_xavier = grad_norm
-        else:
-            gradients_zero = grad_norm
-
-    #logging plots separately
-    table_x = wandb.Table(data=[[i, gradients_xavier[i]] for i in range(len(gradients_xavier))],
-                          columns=["neuron_index", "gradient_norm"])
-    table_z = wandb.Table(data=[[i, gradients_zero[i]] for i in range(len(gradients_zero))],
-                          columns=["neuron_index", "gradient_norm"])
-    wandb.log({
-        "Xavier Initialization Gradient (Layer 1)": wandb.plot.line(table_x, "neuron_index", "gradient_norm", title="Gradient Norms - Xavier Initialization"),
-        "Zero Initialization Gradient (Layer 1)": wandb.plot.line(table_z, "neuron_index", "gradient_norm", title="Gradient Norms - Zero Initialization")})
-    wandb.finish()
-
-
-#run the sweep for all 100 combination
+#running inference
 if __name__ == "__main__":
-  import sys
-  #if inferenceis ran for param sweep
-  if "--sweep" in sys.argv:
-    sweep_id = wandb.sweep(sweep_config, project="DA6401-MLP-Inference")
-    wandb.agent(sweep_id, sweep_run, count=100)
-  #2.9 zero problem
-  elif "--zero" in sys.argv:
-    args = parse_args()
-    zero(args)
-  #if inference is ran for a certain case
-  else:
     main()
