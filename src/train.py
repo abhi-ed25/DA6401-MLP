@@ -5,11 +5,12 @@ import argparse
 import numpy as np
 import wandb
 import random
+import json
 
 #importing all the def functions for usage
-from data import load_data
-from model import MLP
-from optimizer import OPT
+from utils.data_loader import load_data
+from ann.model import MLP
+from ann.optimizers import OPT
 
 #defining randomness for wandb
 np.random.seed(42)
@@ -146,7 +147,7 @@ def train(model, optimizer, X_train, Y_train, X_val, Y_val, args):
 #implementing the def function
 def main():
     args = parse_args()
-    wandb.init(project="DA6401-MLP-Inference", config=vars(args))
+    wandb.init(project="DA6401-MLP", config=vars(args))
     X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(args.dataset)
 
     Y_train = single_guess(Y_train)
@@ -166,7 +167,7 @@ def main():
     test_acc = compute_accuracy(Y_test, test_output)
     print(f"Final Accuracy for MLP is: {test_acc:.4f}")
     params = {"W": model.weights, "b": model.biases}
-    np.save("model.npy", params)
+    np.save("../models/model.npy", params)
     print("Model saved successfully as model.npy")
 
     #saving best configuration
