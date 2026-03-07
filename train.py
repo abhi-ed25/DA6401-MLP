@@ -1,4 +1,4 @@
-# train.py
+#train.py
 
 #importing arg for customization
 import argparse
@@ -14,7 +14,6 @@ from optimizer import OPT
 #defining randomness for wandb
 np.random.seed(42)
 random.seed(42)
-
 
 #arg parse for command line interface
 def parse_args():
@@ -44,127 +43,91 @@ def parse_args():
     #configuration of hidden layer
     parser.add_argument("-nhl","--num_layers", type=int, required=True, help = "Number of Hidden Layers: ")
 
-    #number of neurons in each hidden layer, nargs to seperate the elements of list
+    #number of neurons in each hidden layer
     parser.add_argument("-sz","--hidden_size", type=int, nargs = '+', required=True, help = "List of number of Neurons in each layer: ")
 
-    #choosing activation function, nargs to seperate the elements of list
+    #choosing activation function
     parser.add_argument("-a","--activation", type=str, nargs = '+', choices = ["sigmoid", "tanh", "relu" ], required=True, help = "Activation function (sigmoid, tanh, relu): ")
 
     #chossing initialization
     parser.add_argument("-w_i","--weight_init", type=str, required=True, choices = ["random", "xavier"], help = "W&B initialization (random or xavier): ")
+
     args = parser.parse_args()
 
-    #here the number of hidden layers shall match choices for activation
     if len(args.hidden_size) != len(args.activation):
       raise ValueError("There is a mismatch in network size and activation functions")
-    else:
-      pass
     return args
 
 
 #converting all 10 o/p predictions into single guess
 def single_guess(y, num_classes=10):
-  #ll the 10 predictions = zero
   y_single_guess = np.zeros((len(y), num_classes))
-  #the highest value prediction becomes one
   y_single_guess[np.arange(len(y)), y] = 1
   return y_single_guess
 
+
 #computing general loss function at o/p layer
-def compute_loss(y_true, y_pred, loss_type, final_activation):
-    #ground truth compared to prediction val
+def compute_loss(y_true, y_pred, loss_type):
     m = y_true.shape[0]
     if loss_type == "ce":
-        #if activation is sigmoid and loss is ce
-        if final_activation == "sigmoid":
-            y_pred_prob = y_pred
-        #if activation is tanh and loss is ce
-        elif final_activation == "tanh":
-            #converting tanh output from (-1,1) to (0,1)
-            y_pred_prob = (y_pred + 1.0) / 2.0
-        #if activation is relu and loss is ce
-        elif final_activation == "relu":
-            #converting relu output (0, infinity) to predictions
-            y_pred_shifted = y_pred - np.min(y_pred, axis=1, keepdims=True)
-            #limiting the val
-            y_pred_clipped = np.maximum(y_pred_shifted, 1e-8)
-            #predictions or probability
-            y_pred_prob = y_pred_clipped / np.sum(y_pred_clipped, axis=1, keepdims=True)
-        else:
-            raise ValueError("Please give name of activation function to be used")
-        #giving numerical stability
-        y_pred_prob = np.clip(y_pred_prob, 1e-8, 1 - 1e-8)
-        return -np.sum(y_true * np.log(y_pred_prob)) / m
+        y_pred = np.clip(y_pred, 1e-8, 1-1e-8)
+        return -np.sum(y_true * np.log(y_pred)) / m
 
-
-    #for mse loss formulae remains same for all
     elif loss_type == "mse":
         return np.mean((y_true - y_pred) ** 2)
+
     else:
         raise ValueError("Please give name of loss function to be used")
 
 
 #computing accuray for predictions
 def compute_accuracy(y_true, y_pred):
-    #comparing ground truth to the prediction val
     predict = np.argmax(y_pred, axis=1)
     labels = np.argmax(y_true, axis=1)
     return np.mean(predict == labels)
 
-
 #training the mlp
 def train(model, optimizer, X_train, Y_train, X_val, Y_val, args):
+
   n = len(X_train)
-  #initializing the step val
   step_val = None
-
-  #final activation for loss computation
-  final_activation = args.activation[-1]
-  #running mlp for epochs given by user
   for epoch in range(args.epochs):
-
-      #creating random sequence for training
       perm = np.random.permutation(n)
       X_train = X_train[perm]
       Y_train = Y_train[perm]
 
-      #initializing the training and loss
       total_loss = 0
-
-      #using earlier .py file for implementation
       for i in range(0, len(X_train), args.batch_size):
-          #slicing batches according to batch size i/p
           batch_slice = slice(i, i + args.batch_size)
           X_batch = X_train[batch_slice]
           Y_batch = Y_train[batch_slice]
 
-
           #forward pass
           output, stores = model.forward(X_batch, model.weights, model.biases, model.activations)
 
-          #printing logits
           print("\nLogits (Forward Pass Output):")
           print(output)
 
           #loss function
-          loss = compute_loss(Y_batch, output, args.loss, final_activation)
+          loss = compute_loss(Y_batch, output, args.loss)
           total_loss = total_loss + loss
 
           #backward pass
           grads_W, grads_b = model.backward(X_batch, Y_batch, model.weights, model.biases, model.activations, args.loss, stores, args.weight_decay)
-          #printing the grad as matri with padding for empty elements
-          flat_grads = [g.flatten() for g in grads_W[::-1]]   # reverse order (last→first)
+
+          flat_grads = [g.flatten() for g in grads_W[::-1]]
           max_len = max(len(g) for g in flat_grads)
+
           grad_matrix = []
+
           for g in flat_grads:
               row = list(g) + ["_"] * (max_len - len(g))
               grad_matrix.append(row)
+
           print("\nGradient Matrix:")
           for row in grad_matrix:
               print(row)
 
-
-          #w&b update
           if args.optimizer == "sgd":
               model.weights, model.biases = optimizer.sgd(model.weights, model.biases, grads_W, grads_b, args.learning_rate)
 
@@ -183,7 +146,7 @@ def train(model, optimizer, X_train, Y_train, X_val, Y_val, args):
           elif args.optimizer == "nadam":
               model.weights, model.biases, step_val = optimizer.nadam(model.weights, model.biases, grads_W, grads_b, args.learning_rate, step_val)
 
-      #validating estimation after the complete pass
+
       val_output, _ = model.forward(X_val, model.weights, model.biases, model.activations)
       print("\nValidation Logits:")
       print(val_output)
@@ -192,43 +155,35 @@ def train(model, optimizer, X_train, Y_train, X_val, Y_val, args):
       print(f"Number of Epochs: {epoch+1}/{args.epochs} | "
             f"Total Loss for batch: {total_loss:.4f} | "
             f"Accuracy of the MLP: {val_accuracy:.4f}")
+
       wandb.log({"epoch": epoch, "train_loss": total_loss, "val_accuracy": val_accuracy})
 
 
 #implementing the def function
 def main():
     args = parse_args()
-
-    #loading the data to wandb
     wandb.init(project="DA6401-MLP-Inference", config=vars(args))
-    #loading the data for mnist or fashiion
     X_train, Y_train, X_val, Y_val, X_test, Y_test = load_data(args.dataset)
+
     Y_train = single_guess(Y_train)
     Y_val = single_guess(Y_val)
     Y_test = single_guess(Y_test)
 
-    #customized mlp model according to cli i/p
-    model = MLP(input_size=784, output_size=10, hidden_sizes=args.hidden_size, activations=args.activation, weight_init=args.weight_init)
-    #creating OPT as object to be used
-    #getting optimizer from earlier code
+    #adding softmax automatically for output layer
+    activations = args.activation + ["softmax"]
+    model = MLP(input_size=784, output_size=10, hidden_sizes=args.hidden_size, activations=activations, weight_init=args.weight_init)
     optimizer = OPT()
-    step_val = None
-    #training the model based on i/p from user
+
     train(model, optimizer, X_train, Y_train, X_val, Y_val, args)
-    #calculating prediction and accuracy for the same
     test_output, _ = model.forward(X_test, model.weights, model.biases, model.activations)
     print("\nTest Logits:")
     print(test_output)
 
     test_acc = compute_accuracy(Y_test, test_output)
     print(f"Final Accuracy for MLP is: {test_acc:.4f}")
-    #saving the weights and biases
     params = {"W": model.weights, "b": model.biases}
     np.save("model.npy", params)
     print("Model saved successfully as model.npy")
 
-
-
 if __name__ == "__main__":
     main()
-
