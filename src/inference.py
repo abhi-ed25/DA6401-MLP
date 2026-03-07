@@ -150,7 +150,7 @@ def main():
   X_test, y_test = load_data(args.dataset)
   #initilizing and loading
   print("Please wait: loading model weights...")
-  params = np.load("model.npy", allow_pickle=True).item()
+  params = np.load("../models/best_model.npy", allow_pickle=True).item()
   weights = [w.astype(np.float64) for w in params["W"]]
   biases  = [b.astype(np.float64) for b in params["b"]]
   #running all the arg parse for delivering values and commands
