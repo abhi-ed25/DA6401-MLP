@@ -105,28 +105,12 @@ def train(model, optimizer, X_train, Y_train, X_val, Y_val, args):
           #forward pass
           output, stores = model.forward(X_batch, model.weights, model.biases, model.activations)
 
-          print("\nLogits (Forward Pass Output):")
-          print(output)
-
           #loss function
           loss = compute_loss(Y_batch, output, args.loss)
           total_loss = total_loss + loss
 
           #backward pass
           grads_W, grads_b = model.backward(X_batch, Y_batch, model.weights, model.biases, model.activations, args.loss, stores, args.weight_decay)
-
-          flat_grads = [g.flatten() for g in grads_W[::-1]]
-          max_len = max(len(g) for g in flat_grads)
-
-          grad_matrix = []
-
-          for g in flat_grads:
-              row = list(g) + ["_"] * (max_len - len(g))
-              grad_matrix.append(row)
-
-          print("\nGradient Matrix:")
-          for row in grad_matrix:
-              print(row)
 
           if args.optimizer == "sgd":
               model.weights, model.biases = optimizer.sgd(model.weights, model.biases, grads_W, grads_b, args.learning_rate)
