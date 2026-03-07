@@ -9,7 +9,7 @@ import json
 
 #importing all the def functions for usage
 from utils.data_loader import load_data
-from ann.model import MLP
+from ann.neural_network import NeuralNetwork
 from ann.optimizers import OPT
 
 #defining randomness for wandb
