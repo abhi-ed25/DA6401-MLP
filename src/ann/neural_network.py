@@ -5,7 +5,7 @@ from ann.neural_layer import initialize_weights
 
 
 #within the class MLP defininf all the functions
-class MLP:
+class NeuralNetwork:
   def __init__(self, input_size, output_size, hidden_sizes, activations, weight_init):
     #creating full layer structure: input → hidden → output
     self.layers = [input_size] + hidden_sizes + [output_size]
